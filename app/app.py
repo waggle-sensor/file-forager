@@ -175,14 +175,15 @@ def prepare_and_upload_file(file_info, plugin, base_metadata, args, uploaded_df,
             "last_modified_timestamp_source": mtime,
             "log_timestamp_utc": iso_utc(time.time())
         })
-        plugin.publish("error", {"message": f"Skipped {path}", "reason": reason})
+        plugin.publish("error", f'''Skipped {path} reason: {reason} 
+                       device_name: {base_metadata.get("device_name", "unknown")}''')
         return False, 0
 
     metadata = base_metadata.copy()
     metadata.update({
-        "original_path": path,
-        "filename": filename,
-        "size_bytes": size,
+        "original_path": str(path),
+        "filename": str(filename),
+        "size_bytes": str(size),
         "last_modified_timestamp_source": iso_utc(mtime)
     })
 
@@ -195,9 +196,9 @@ def prepare_and_upload_file(file_info, plugin, base_metadata, args, uploaded_df,
             logging.info(f"[Dry Run] Would upload: {file_to_upload}")
             return True, size
 
-        plugin.publish("status", f"Uploading {filename_on_beehive}")
-        timestamp = mtime
-        plugin.upload_file(file_to_upload, metadata, timestamp=timestamp)
+        plugin.publish("status", f'''Uploading {filename_on_beehive} 
+                       device_name: {metadata.get("device_name", "unknown")}''')
+        plugin.upload_file(file_to_upload, metadata, timestamp=int(mtime * 1e9), keep=True)
 
         append_to_csv(args.uploaded_csv, {
             "original_path": path,
@@ -212,11 +213,8 @@ def prepare_and_upload_file(file_info, plugin, base_metadata, args, uploaded_df,
         if args.delete_files:
             os.remove(path)
 
-        plugin.publish("status", {
-            "message": f"Uploaded {filename}",
-            "file_path": path,
-            "device_name": base_metadata.get("device_name", "unknown")
-        })
+        plugin.publish("status", f'''Uploaded {filename}
+                       device_name: {metadata.get("device_name", "unknown")}''')
 
         return True, size
 
@@ -229,11 +227,8 @@ def prepare_and_upload_file(file_info, plugin, base_metadata, args, uploaded_df,
             "last_modified_timestamp_source": mtime,
             "log_timestamp_utc": iso_utc(time.time())
         })
-        plugin.publish("error", {
-            "message": f"Failed to upload {filename}",
-            "error_details": str(e),
-            "device_name": base_metadata.get("device_name", "unknown")
-        })
+        plugin.publish("error", f'''Failed to upload {filename} error_details: {str(e)},
+                       device_name: {metadata.get("device_name", "unknown")}''')
         return False, 0
     finally:
         if temp_file and os.path.exists(temp_file):
@@ -243,14 +238,14 @@ def prepare_and_upload_file(file_info, plugin, base_metadata, args, uploaded_df,
 # ========== Main ==========
 def main():
     parser = argparse.ArgumentParser(description="FileForager - Waggle File Uploader")
-    parser.add_argument("--source", required= True)
+    parser.add_argument("--source", default= '/data/')
     parser.add_argument("--glob", default=None)
     parser.add_argument("-r", "--recursive", action="store_true")
     parser.add_argument("--skip-last-file", type=int, default=1)
     parser.add_argument("--sort-key", choices=["mtime", "name"], default="mtime")
     parser.add_argument("--max-file-size", type=int, default=1 * 1024 * 1024 * 1024)
     parser.add_argument("--num-files", type=int, default=10)
-    parser.add_argument("--sleep", type=float, default=0)
+    parser.add_argument("--sleep", type=float, default=3)
     parser.add_argument("--prefix", default="")
     parser.add_argument("--suffix", default="")
     parser.add_argument("--dry-run", action="store_true")
@@ -281,7 +276,7 @@ def main():
                                args.recursive, uploaded_df, args.skip_last_file,
                                args.sort_key, args.transfer_symlinks)
         logging.info(f"Found {len(files)} files to process.")
-        plugin.publish("status", f"Found {len(files)} recent files.")
+        plugin.publish("status", f'''Found {len(files)} recent files. device_name: {metadata.get("device_name", "unknown")}''')
 
         count = 0
         total_bytes = 0
