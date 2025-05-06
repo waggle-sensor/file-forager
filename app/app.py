@@ -256,21 +256,25 @@ def prepare_and_upload_file(file_info, plugin, base_metadata, args, uploaded_df,
 
 # ========== Main ==========
 def main():
-    parser = argparse.ArgumentParser(description="FileForager - Waggle File Uploader")
-    parser.add_argument("--source", default= '/data/')
-    parser.add_argument("--glob", default=None)
-    parser.add_argument("-r", "--recursive", action="store_true")
-    parser.add_argument("--skip-last-file", type=int, default=1)
-    parser.add_argument("--sort-key", choices=["mtime", "name"], default="mtime")
-    parser.add_argument("--max-file-size", type=int, default=1 * 1024 * 1024 * 1024)
-    parser.add_argument("--num-files", type=int, default=10)
-    parser.add_argument("--sleep", type=float, default=3)
-    parser.add_argument("--prefix", default="")
-    parser.add_argument("--suffix", default="")
-    parser.add_argument("--dry-run", action="store_true")
-    parser.add_argument("--delete-files", action="store_true")
-    parser.add_argument("--transfer-symlinks", action="store_true")
-    parser.add_argument("--DEBUG", action="store_true")
+    parser = argparse.ArgumentParser(
+        description="FileForager - Sync files from local folders to Beehive via Waggle plugin.upload_file."
+    )
+
+    parser.add_argument("--source", default="/data/", help="Source directory containing files to upload.")
+    parser.add_argument("--glob", default=None, help="Optional glob pattern to filter files (e.g., '*.csv').")
+    parser.add_argument("-r", "--recursive", action="store_true", help="Recursively scan subdirectories.")
+    parser.add_argument("--skip-last-file", type=int, default=1, help="Skip the most recently modified N files.")
+    parser.add_argument("--sort-key", choices=["mtime", "name"], default="mtime", help="Sort files by 'mtime' or 'name'.")
+    parser.add_argument("--max-file-size", type=int, default=1 * 1024 * 1024 * 1024, help="Maximum file size to upload (in bytes).")
+    parser.add_argument("--num-files", type=int, default=10, help="Number of files to upload per run.")
+    parser.add_argument("--sleep", type=float, default=3, help="Sleep time (in seconds) between file uploads.")
+    parser.add_argument("--prefix", default="", help="Prefix to prepend to uploaded file names.")
+    parser.add_argument("--suffix", default="", help="Suffix to append to uploaded file names.")
+    parser.add_argument("--dry-run", action="store_true", help="Preview actions without uploading files.")
+    parser.add_argument("--delete-files", action="store_true", help="Delete source files after successful upload.")
+    parser.add_argument("--transfer-symlinks", action="store_true", help="Follow and upload symlinks (default: skip).")
+    parser.add_argument("--DEBUG", action="store_true", help="Enable detailed debug logging.")
+
 
     args = parser.parse_args()
     setup_logging(args)
