@@ -21,7 +21,6 @@ from waggle.plugin import Plugin
 
 
 # ========== Constants ==========
-DEFAULT_CONFIG_DIR = os.path.expanduser(".fileforager/")
 UPLOADED_CSV = "uploaded_files.csv"
 SKIPPED_CSV = "skipped_files.csv"
 PROCESSING_LOG = "processing_errors.log"
@@ -43,6 +42,25 @@ def load_yaml_file(path):
     except Exception as e:
         logging.error(f"Error loading YAML file: {e}")
         return None
+
+
+def validate_metadata(metadata):
+    """
+    Validates that all required fields are present in the metadata dict.
+    Exits with an error if any are missing.
+    """
+
+    required_fields = ["upload_name", "site", "sensor", "creator", "original_path"]
+
+    missing = [field for field in required_fields if field not in metadata]
+    
+    if missing:
+        logging.error(f"Missing required metadata fields: {', '.join(missing)}")
+        logging.info(f"Your metadata.yaml must contain these fields {required_fields}")
+        sys.exit(1)
+    
+    # Make all values strings
+    return {str(k): str(v) for k, v in metadata.items()}
 
 
 def read_csv(path):
@@ -94,6 +112,7 @@ def file_already_uploaded(file_path, size, mtime, uploaded_df):
 
 
 def apply_filename_modifiers(filename, prefix, suffix):
+    """Applies a prefix/suffix to a filename (before extension)."""
     base, ext = os.path.splitext(filename)
     return f"{prefix}{base}{suffix}{ext}"
 
@@ -254,18 +273,28 @@ def main():
     parser.add_argument("--DEBUG", action="store_true")
 
     args = parser.parse_args()
+    setup_logging(args)
+
     config_dir = f'{args.source}/.forager/'
+
+    #check that source directory and config directory exist
+    if not (os.path.isdir(args.source) and os.path.isdir(config_dir)):
+        logging.error("Missing source or config directory.")
+        logging.info("Check documentation for creating config directory.")
+        return -1
+
     args.uploaded_csv = os.path.join(config_dir, UPLOADED_CSV)
     args.skipped_csv = os.path.join(config_dir, SKIPPED_CSV)
 
-    os.makedirs(config_dir, exist_ok=True)
-    setup_logging(args)
+
 
     metadata_path = os.path.join(config_dir, "metadata.yaml")
     metadata = load_yaml_file(metadata_path)
     if metadata is None:
         logging.error("Missing or bad metadata.yaml")
         return
+
+    metadata = validate_metadata(metadata)
 
     # if no csv file found then you need to create a file that gives empty df with correct column names.
     uploaded_df = read_csv(args.uploaded_csv)
