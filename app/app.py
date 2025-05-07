@@ -244,7 +244,8 @@ def prepare_and_upload_file(file_info, plugin, base_metadata, args, uploaded_df,
 
     try:
         if args.dry_run:
-            logging.info(f"[Dry Run] Would upload: {file_to_upload}")
+            logging.info(f"[Dry Run] Would not upload: {file_to_upload}")
+            plugin.publish("status", f"[Dry Run] Would not upload: {file_to_upload}")
             return True, size
 
         plugin.publish("status", f'''Uploading {filename} 

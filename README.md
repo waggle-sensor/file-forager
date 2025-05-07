@@ -73,8 +73,6 @@ python3 fileforager.py \
   --glob "*.txt" \
   --skip-last-file 1 \
   --num-files 2 \
-  --prefix "node1_" \
-  --suffix "_2025" \
   --dry-run \
   --DEBUG
 ```
@@ -92,8 +90,6 @@ Remove --dry-run to perform actual uploads.
 | `--max-file-size`     | Max size per file (in bytes)          |
 | `--num-files`         | Number of files to upload per run     |
 | `--sleep`             | Delay between uploads                 |
-| `--prefix`            | Prefix for uploaded filenames         |
-| `--suffix`            | Suffix for uploaded filenames         |
 | `--dry-run`           | Don't actually upload — just simulate |
 | `--delete-files`      | Delete original file after upload     |
 | `--transfer-symlinks` | Follow symlinks (default: skip)       |
