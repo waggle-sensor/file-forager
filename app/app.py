@@ -135,7 +135,12 @@ def discover_files(folder_path, glob_pattern, recursive, uploaded_df, skip_last_
     logging.info("Scanning for files...")
     all_files = []
 
-    pattern = glob_pattern or ("**/*" if recursive else "*")
+    if glob_pattern:
+        #when --recursive is enabled
+        pattern = f"**/{glob_pattern}" if recursive else glob_pattern
+    else:
+        pattern = "**/*" if recursive else "*"
+
     base_path = Path(folder_path)
     paths = sorted(base_path.rglob(pattern) if recursive else base_path.glob(pattern))
 

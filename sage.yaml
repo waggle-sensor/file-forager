@@ -1,8 +1,8 @@
 name: "file-forager"
 description: "Uploads files from a Waggle node's filesystem to Beehive with local state tracking."
-version: "0.25.5.6"
+version: "0.25.5.7"
 authors: "Bhupendra Raut"
-collaborators: "Yongho Kim, Bobby Jackson, Sean Shahkarami, Max Grover, Joe O'Brien and Raj Sankaran"
+collaborators: "Yongho Kim, Bobby Jackson, Sean Shahkarami, Max Grover, Joe O'Brien, and Raj Sankaran"
 funding: "CROCUS"
 license: "GNU GPLv3"
 keywords: "file-sync, beehive, waggle, rsync-alternative"
@@ -13,3 +13,6 @@ source:
     - "linux/arm64"
   url: "https://github.com/waggle-sensor/file-forager"
   branch: "main"
+baseCommand: >
+  python3 /app/app.py --source /data/ --glob "*.nc" --recursive --num-files 10 --sleep 2 --timestamp current
+depends_on: []
