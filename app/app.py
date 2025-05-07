@@ -16,9 +16,11 @@ import logging
 from datetime import datetime, timezone
 from pathlib import Path
 from zipfile import ZipFile, ZIP_DEFLATED
+import hashlib
 
 from waggle.plugin import Plugin, get_timestamp
 
+# @todo ADD: option to zip subdirectories and upload when asked by the user.
 
 # ========== Constants ==========
 UPLOADED_CSV = "uploaded_files.csv"
@@ -65,11 +67,8 @@ def validate_metadata(metadata):
 
 def read_csv(path):
     """Reads a CSV into a DataFrame, or creates one with appropriate headers if file doesn't exist."""
-    uploaded_columns = [
-        "original_path", "filename_at_upload", "size_bytes",
-        "last_modified_timestamp_source", "upload_timestamp_utc",
-        "metadata_sent_json", "upload_status"
-    ]
+    uploaded_columns = ["original_path", "filename", "last_modified_timestamp_source", "file_hash"]
+
     skipped_columns = [
         "file_path", "reason_skipped", "size_bytes",
         "last_modified_timestamp_source", "log_timestamp_utc"
@@ -88,7 +87,6 @@ def read_csv(path):
     return pd.read_csv(path)
 
 
-
 def append_to_csv(path, row_dict):
     df = pd.DataFrame([row_dict])
     if not os.path.exists(path):
@@ -101,21 +99,23 @@ def iso_utc(ts):
     return datetime.fromtimestamp(ts, tz=timezone.utc).isoformat()
 
 
+def compute_file_hash(file_path, hash_algo='sha256'):
+    """Compute hash of a file."""
+    hash_func = hashlib.new(hash_algo)
+    with open(file_path, 'rb') as f:
+        while chunk := f.read(8192):
+            hash_func.update(chunk)
+    return hash_func.hexdigest()
 
-def file_already_uploaded(file_path, size, mtime, uploaded_df):
-    matches = uploaded_df[
-        (uploaded_df['original_path'] == file_path) &
-        (uploaded_df['size_bytes'] == size) &
-        (uploaded_df['last_modified_timestamp_source'] == mtime) &
-        (uploaded_df['upload_status'] == "success")
-    ]
+
+def file_already_uploaded(file_path, uploaded_df, hash_algo='sha256'):
+    """Check if a file with the same hash has already been uploaded (regardless of name)."""
+    file_hash = compute_file_hash(file_path, hash_algo)
+
+    matches = uploaded_df[uploaded_df['file_hash'] == file_hash]
+
     return not matches.empty
 
-
-def apply_filename_modifiers(filename, prefix, suffix):
-    """Applies a prefix/suffix to a filename (before extension)."""
-    base, ext = os.path.splitext(filename)
-    return f"{prefix}{base}{suffix}{ext}"
 
 
 def zip_directory(source_path, level):
@@ -131,51 +131,79 @@ def zip_directory(source_path, level):
 
 # ========== File Discovery ==========
 def discover_files(folder_path, glob_pattern, recursive, uploaded_df, skip_last_n, sort_key, transfer_symlinks):
+    """Scan folder_path for eligible files to upload, applying filters and exclusions."""
     logging.info("Scanning for files...")
     all_files = []
-    pattern = "**/*" if recursive else "*"
-    if glob_pattern:
-        pattern = glob_pattern
 
-    paths = sorted(Path(folder_path).rglob(pattern) if recursive else Path(folder_path).glob(pattern))
-    for p in paths:
-        if p.is_dir():
-            continue
-        if p.is_symlink() and not transfer_symlinks:
-            logging.info(f"Skipping symlink: {p}")
+    pattern = glob_pattern or ("**/*" if recursive else "*")
+    base_path = Path(folder_path)
+    paths = sorted(base_path.rglob(pattern) if recursive else base_path.glob(pattern))
+
+    for path in paths:
+        if should_skip_file(path, transfer_symlinks):
             continue
 
-        str_path = str(p)
-        try:
-            stat = p.stat()
-        except Exception as e:
-            logging.warning(f"Error stat-ing file {p}: {e}")
+        file_info = get_file_stat_info(path)
+        if not file_info:
             continue
 
-        size = stat.st_size
-        mtime = stat.st_mtime
-        if file_already_uploaded(str_path, size, mtime, uploaded_df):
+        if is_already_uploaded(file_info["path"], uploaded_df):
+            logging.info(f"Skipping already uploaded: {file_info['path']}")
             continue
 
-        all_files.append({
-            "path": str_path,
-            "size": size,
-            "mtime": mtime,
-            "name": p.name
-        })
+        all_files.append(file_info)
 
-    # Sort
+    # Sort files
     if sort_key == "mtime":
         all_files.sort(key=lambda x: x["mtime"])
     else:
         all_files.sort(key=lambda x: x["name"])
 
+    # Skip most recent N files
     if skip_last_n > 0:
         deferred = all_files[-skip_last_n:]
         all_files = all_files[:-skip_last_n]
         logging.info(f"Skipping {len(deferred)} recently modified files")
 
     return all_files
+
+def is_hidden_path(path: Path) -> bool:
+    """Check if any part of the path is hidden (starts with a dot)."""
+    return any(part.startswith('.') for part in path.parts)
+
+
+def should_skip_file(path: Path, transfer_symlinks: bool) -> bool:
+    """Determine if the file should be skipped based on type, symlink, or hidden folder."""
+    if path.is_dir():
+        return True
+    if path.is_symlink() and not transfer_symlinks:
+        logging.debug(f"Skipping symlink: {path}")
+        return True
+    if is_hidden_path(path):
+        logging.debug(f"Skipping hidden path: {path}")
+        return True
+    return False
+
+
+def get_file_stat_info(path: Path):
+    """Get file size, mtime, and name with safe error handling."""
+    try:
+        stat = path.stat()
+        return {
+            "path": str(path),
+            "size": stat.st_size,
+            "mtime": stat.st_mtime,
+            "name": path.name
+        }
+    except Exception as e:
+        logging.warning(f"Failed to stat file {path}: {e}")
+        return None
+
+
+def is_already_uploaded(path: str, uploaded_df) -> bool:
+    """Return True if the file is already uploaded (based on hash)."""
+    return file_already_uploaded(path, uploaded_df)
+
 
 
 # ========== Upload Logic ==========
@@ -207,34 +235,35 @@ def prepare_and_upload_file(file_info, plugin, base_metadata, args, uploaded_df,
         "last_modified_timestamp_source": iso_utc(mtime)
     })
 
-    filename_on_beehive = apply_filename_modifiers(filename, args.prefix, args.suffix)
     file_to_upload = path
 
-    temp_file = None
+    # Calculate file hash
+    file_hash = compute_file_hash(file_to_upload)
+
+    metadata["file_hash"] = file_hash
+
     try:
         if args.dry_run:
             logging.info(f"[Dry Run] Would upload: {file_to_upload}")
             return True, size
 
-        plugin.publish("status", f'''Uploading {filename_on_beehive} 
+        plugin.publish("status", f'''Uploading {filename} 
                        upload_name: {metadata.get("upload_name", "unknown")}''')
-        
+
         if args.timestamp == 'mtime':
-            timestamp=int(mtime * 1e9)
+            timestamp = int(mtime * 1e9)
         else:
             timestamp = get_timestamp()
 
-
         plugin.upload_file(file_to_upload, metadata, timestamp=timestamp, keep=True)
+
         append_to_csv(args.uploaded_csv, {
             "original_path": path,
-            "filename_at_upload": filename_on_beehive,
-            "size_bytes": size,
+            "filename": filename,
             "last_modified_timestamp_source": mtime,
-            "upload_timestamp_utc": iso_utc(time.time()),
-            "metadata_sent_json": json.dumps(metadata),
-            "upload_status": "success"
+            "file_hash": file_hash
         })
+
 
         if args.delete_files:
             os.remove(path)
@@ -256,9 +285,6 @@ def prepare_and_upload_file(file_info, plugin, base_metadata, args, uploaded_df,
         plugin.publish("error", f'''Failed to upload {filename} error_details: {str(e)},
                        upload_name: {metadata.get("upload_name", "unknown")}''')
         return False, 0
-    finally:
-        if temp_file and os.path.exists(temp_file):
-            os.remove(temp_file)
 
 
 # ========== Main ==========
@@ -267,6 +293,7 @@ def main():
         description="FileForager - Sync files from local folders to Beehive via Waggle plugin.upload_file."
     )
 
+    # Add arguments for the CLI
     parser.add_argument("--source", default="/data/", help="Source directory containing files to upload.")
     parser.add_argument("--glob", default=None, help="Optional glob pattern to filter files (e.g., '*.csv').")
     parser.add_argument("--timestamp", default='current', choices=['mtime', 'current'], help="Files timestamp in beehive")
@@ -276,8 +303,6 @@ def main():
     parser.add_argument("--max-file-size", type=int, default=1 * 1024 * 1024 * 1024, help="Maximum file size to upload (in bytes).")
     parser.add_argument("--num-files", type=int, default=10, help="Number of files to upload per run.")
     parser.add_argument("--sleep", type=float, default=3, help="Sleep time (in seconds) between file uploads.")
-    parser.add_argument("--prefix", default="", help="Prefix to prepend to uploaded file names.")
-    parser.add_argument("--suffix", default="", help="Suffix to append to uploaded file names.")
     parser.add_argument("--dry-run", action="store_true", help="Preview actions without uploading files.")
     parser.add_argument("--delete-files", action="store_true", help="Delete source files after successful upload.")
     parser.add_argument("--transfer-symlinks", action="store_true", help="Follow and upload symlinks (default: skip).")
@@ -289,7 +314,7 @@ def main():
 
     config_dir = f'{args.source}/.forager/'
 
-    #check that source directory and config directory exist
+    # Check that source directory and config directory exist
     if not (os.path.isdir(args.source) and os.path.isdir(config_dir)):
         logging.error("Missing source or config directory.")
         logging.info("Check documentation for creating config directory.")
@@ -297,8 +322,6 @@ def main():
 
     args.uploaded_csv = os.path.join(config_dir, UPLOADED_CSV)
     args.skipped_csv = os.path.join(config_dir, SKIPPED_CSV)
-
-
 
     metadata_path = os.path.join(config_dir, "metadata.yaml")
     metadata = load_yaml_file(metadata_path)
@@ -308,7 +331,7 @@ def main():
 
     metadata = validate_metadata(metadata)
 
-    # if no csv file found then you need to create a file that gives empty df with correct column names.
+    # If no CSV file found then create an empty dataframe with correct columns.
     uploaded_df = read_csv(args.uploaded_csv)
     skipped_df = read_csv(args.skipped_csv)
 
