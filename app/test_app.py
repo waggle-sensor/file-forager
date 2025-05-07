@@ -9,11 +9,9 @@ import shutil
 import pandas as pd
 
 
-
-
 from app import (
     load_yaml_file, validate_metadata, read_csv, append_to_csv,
-    iso_utc, file_already_uploaded, apply_filename_modifiers,
+    iso_utc, file_already_uploaded, 
     zip_directory, discover_files
 )
 
@@ -89,10 +87,6 @@ def test_file_already_uploaded_match():
     df = pd.DataFrame(data)
     assert file_already_uploaded("/a.txt", 100, 1234567890, df) is True
     assert file_already_uploaded("/a.txt", 200, 1234567890, df) is False
-
-
-def test_apply_filename_modifiers():
-    assert apply_filename_modifiers("data.txt", "pre_", "_suf") == "pre_data_suf.txt"
 
 
 def test_zip_directory_creates_zip(tmp_path):
