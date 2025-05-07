@@ -144,6 +144,26 @@ scienceRules:
 successCriteria: []
 ```
 
+## ⬇️ Querying Uploads with Metadata Filtering
+
+To ensure each user accesses only their own uploaded data, we use metadata keys defined in `metadata.yaml` to filter results. The query below retrieves data from the File Forager app using `sage_data_client.query()` with appropriate constraints:
+
+```python
+import sage_data_client
+
+df = sage_data_client.query(
+    start="2025-04-10T21:26:00Z",
+    end="2025-04-10T22:26:00Z",
+    filter={
+        "plugin": ".*file-forager:0.25.5.7",
+        "vsn": "W09A",
+        "upload_name": "cl61_files",
+        "site": "ATMOS",
+        "sensor": "vaisala_cl61",
+    }
+)
+```
+
 ## 📢 Contact
 
 Questions or contributions? Reach out to the Waggle or CROCUS community or open a GitHub issue.

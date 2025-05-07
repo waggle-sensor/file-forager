@@ -106,10 +106,63 @@ Upload state is tracked in:
     .forager/skipped_files.csv
 
 Status is published via `plugin.publish("status", ...)`
-
 Errors are published via `plugin.publish("error", ...)`
-
 Final stats published via `plugin.publish("upload.stats", ...)`
+
+
+## 🔁 Job Submission
+
+```yaml
+name: cl61-upload
+plugins:
+- name: cl61-upload
+  pluginSpec:
+    image: registry.sagecontinuum.org/bhupendraraut/file-forager:0.25.x.x
+    args:
+    - --glob
+    - '*.txt'
+    - --recursive
+    - --timestamp
+    - mtime
+    - --skip-last-file
+    - "1"
+    - --sort-key
+    - mtime
+    - --num-files
+    - "10"
+    - --sleep
+    - "5"
+    selector:
+      zone: core
+    volume:
+      /home/waggle/data: /data
+nodeTags: []
+nodes:
+  W0xx: true
+scienceRules:
+- 'schedule("cl61-upload"): cronjob("cl61-upload", "20 * * * *")'
+successCriteria: []
+```
+
+## ⬇️ Querying Uploads with Metadata Filtering
+
+To ensure each user accesses only their own uploaded data, we use metadata keys defined in `metadata.yaml` to filter results. The query below retrieves data from the File Forager app using `sage_data_client.query()` with appropriate constraints:
+
+```python
+import sage_data_client
+
+df = sage_data_client.query(
+    start="2025-04-10T21:26:00Z",
+    end="2025-04-10T22:26:00Z",
+    filter={
+        "plugin": ".*file-forager:0.25.5.7",
+        "vsn": "W09A",
+        "upload_name": "cl61_files",
+        "site": "ATMOS",
+        "sensor": "vaisala_cl61",
+    }
+)
+```
 
 ## 📢 Contact
 
