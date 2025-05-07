@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from zipfile import ZipFile, ZIP_DEFLATED
 
-from waggle.plugin import Plugin
+from waggle.plugin import Plugin, get_timestamp
 
 
 # ========== Constants ==========
@@ -222,7 +222,7 @@ def prepare_and_upload_file(file_info, plugin, base_metadata, args, uploaded_df,
         if args.timestamp == 'mtime':
             timestamp=int(mtime * 1e9)
         else:
-            timestamp = plugin.get_timestamp()
+            timestamp = get_timestamp()
 
 
         plugin.upload_file(file_to_upload, metadata, timestamp=timestamp, keep=True)
