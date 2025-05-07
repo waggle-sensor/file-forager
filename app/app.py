@@ -76,9 +76,9 @@ def read_csv(path):
     ]
 
     if not os.path.exists(path):
-        if "uploaded" in path:
+        if "uploaded" in str(path):
             df = pd.DataFrame(columns=uploaded_columns)
-        elif "skipped" in path:
+        elif "skipped" in str(path):
             df = pd.DataFrame(columns=skipped_columns)
         else:
             df = pd.DataFrame()
@@ -97,8 +97,9 @@ def append_to_csv(path, row_dict):
         df.to_csv(path, mode='a', header=False, index=False)
 
 
-def iso_utc(timestamp):
-    return datetime.utcfromtimestamp(timestamp).replace(tzinfo=timezone.utc).isoformat()
+def iso_utc(ts):
+    return datetime.fromtimestamp(ts, tz=timezone.utc).isoformat()
+
 
 
 def file_already_uploaded(file_path, size, mtime, uploaded_df):
@@ -195,7 +196,7 @@ def prepare_and_upload_file(file_info, plugin, base_metadata, args, uploaded_df,
             "log_timestamp_utc": iso_utc(time.time())
         })
         plugin.publish("error", f'''Skipped {path} reason: {reason} 
-                       device_name: {base_metadata.get("device_name", "unknown")}''')
+                       upload_name: {base_metadata.get("upload_name", "unknown")}''')
         return False, 0
 
     metadata = base_metadata.copy()
@@ -216,9 +217,15 @@ def prepare_and_upload_file(file_info, plugin, base_metadata, args, uploaded_df,
             return True, size
 
         plugin.publish("status", f'''Uploading {filename_on_beehive} 
-                       device_name: {metadata.get("device_name", "unknown")}''')
-        plugin.upload_file(file_to_upload, metadata, timestamp=int(mtime * 1e9), keep=True)
+                       upload_name: {metadata.get("upload_name", "unknown")}''')
+        
+        if args.timestamp == 'mtime':
+            timestamp=int(mtime * 1e9)
+        else:
+            timestamp = plugin.get_timestamp()
 
+
+        plugin.upload_file(file_to_upload, metadata, timestamp=timestamp, keep=True)
         append_to_csv(args.uploaded_csv, {
             "original_path": path,
             "filename_at_upload": filename_on_beehive,
@@ -233,7 +240,7 @@ def prepare_and_upload_file(file_info, plugin, base_metadata, args, uploaded_df,
             os.remove(path)
 
         plugin.publish("status", f'''Uploaded {filename}
-                       device_name: {metadata.get("device_name", "unknown")}''')
+                       upload_name: {metadata.get("upload_name", "unknown")}''')
 
         return True, size
 
@@ -247,7 +254,7 @@ def prepare_and_upload_file(file_info, plugin, base_metadata, args, uploaded_df,
             "log_timestamp_utc": iso_utc(time.time())
         })
         plugin.publish("error", f'''Failed to upload {filename} error_details: {str(e)},
-                       device_name: {metadata.get("device_name", "unknown")}''')
+                       upload_name: {metadata.get("upload_name", "unknown")}''')
         return False, 0
     finally:
         if temp_file and os.path.exists(temp_file):
@@ -262,6 +269,7 @@ def main():
 
     parser.add_argument("--source", default="/data/", help="Source directory containing files to upload.")
     parser.add_argument("--glob", default=None, help="Optional glob pattern to filter files (e.g., '*.csv').")
+    parser.add_argument("--timestamp", default='current', choices=['mtime', 'current'], help="Files timestamp in beehive")
     parser.add_argument("-r", "--recursive", action="store_true", help="Recursively scan subdirectories.")
     parser.add_argument("--skip-last-file", type=int, default=1, help="Skip the most recently modified N files.")
     parser.add_argument("--sort-key", choices=["mtime", "name"], default="mtime", help="Sort files by 'mtime' or 'name'.")
@@ -309,7 +317,7 @@ def main():
                                args.recursive, uploaded_df, args.skip_last_file,
                                args.sort_key, args.transfer_symlinks)
         logging.info(f"Found {len(files)} files to process.")
-        plugin.publish("status", f'''Found {len(files)} recent files. device_name: {metadata.get("device_name", "unknown")}''')
+        plugin.publish("status", f'''Found {len(files)} recent files. upload_name: {metadata.get("upload_name", "unknown")}''')
 
         count = 0
         total_bytes = 0
@@ -324,7 +332,7 @@ def main():
 
         plugin.publish("upload.stats", f'''transferred_count: {count} , 
                        total_bytes: {total_bytes},
-                       device_name: {metadata.get("device_name", "unknown")}''')
+                       upload_name: {metadata.get("upload_name", "unknown")}''')
         logging.info("Run complete.")
 
 
