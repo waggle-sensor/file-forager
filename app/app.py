@@ -248,8 +248,8 @@ def prepare_and_upload_file(file_info, plugin, base_metadata, args, uploaded_df,
             plugin.publish("status", f"[Dry Run] Would not upload: {file_to_upload}")
             return True, size
 
-        plugin.publish("status", f'''Uploading {filename} 
-                       upload_name: {metadata.get("upload_name", "unknown")}''')
+        #plugin.publish("status", f'''Uploading {filename} 
+        #               upload_name: {metadata.get("upload_name", "unknown")}''')
 
         if args.timestamp == 'mtime':
             timestamp = int(mtime * 1e9)
@@ -269,8 +269,12 @@ def prepare_and_upload_file(file_info, plugin, base_metadata, args, uploaded_df,
         if args.delete_files:
             os.remove(path)
 
+        dt = datetime.fromtimestamp(timestamp / 1e9)
+
+        # Format to ISO string or custom format
+        timestamp_str = dt.strftime("%Y-%m-%dT%H:%M:%S.%f")
         plugin.publish("status", f'''Uploaded {filename}
-                       upload_name: {metadata.get("upload_name", "unknown")}''')
+                       upload_name: {metadata.get("upload_name", "unknown")} at {timestamp_str}''')
 
         return True, size
 
