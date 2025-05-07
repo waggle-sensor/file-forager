@@ -106,10 +106,43 @@ Upload state is tracked in:
     .forager/skipped_files.csv
 
 Status is published via `plugin.publish("status", ...)`
-
 Errors are published via `plugin.publish("error", ...)`
-
 Final stats published via `plugin.publish("upload.stats", ...)`
+
+
+## 🔁 Job Submission
+
+```yaml
+name: cl61-upload
+plugins:
+- name: cl61-upload
+  pluginSpec:
+    image: registry.sagecontinuum.org/bhupendraraut/file-forager:0.25.x.x
+    args:
+    - --glob
+    - '*.txt'
+    - --recursive
+    - --timestamp
+    - mtime
+    - --skip-last-file
+    - "1"
+    - --sort-key
+    - mtime
+    - --num-files
+    - "10"
+    - --sleep
+    - "5"
+    selector:
+      zone: core
+    volume:
+      /home/waggle/data: /data
+nodeTags: []
+nodes:
+  W0xx: true
+scienceRules:
+- 'schedule("cl61-upload"): cronjob("cl61-upload", "20 * * * *")'
+successCriteria: []
+```
 
 ## 📢 Contact
 
