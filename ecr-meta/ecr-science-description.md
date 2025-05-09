@@ -85,6 +85,7 @@ Remove --dry-run to perform actual uploads.
 | `--source`            | Source directory (default: `/data/`)  |
 | `--glob`              | Glob pattern (e.g., `*.csv`)          |
 | `--recursive`         | Recursively scan subfolders           |
+| `--timestamp`         | File timestamp in Beehive: `"current"` or `"mtime"` |
 | `--skip-last-file`    | Skip N most recently modified files   |
 | `--sort-key`          | Sort by `"mtime"` or `"name"`         |
 | `--max-file-size`     | Max size per file (in bytes)          |
@@ -94,6 +95,7 @@ Remove --dry-run to perform actual uploads.
 | `--delete-files`      | Delete original file after upload     |
 | `--transfer-symlinks` | Follow symlinks (default: skip)       |
 | `--DEBUG`             | Enable debug logging                  |
+
 
 ## 📝 Logging and Status
 
@@ -163,7 +165,9 @@ df = sage_data_client.query(
     }
 )
 ```
+NOTE: When `--timestamp` is set to `mtime`, the file times in Beehive will be backdated to original modified time.
 
 ## 📢 Contact
 
-Questions or contributions? Reach out to the Waggle or CROCUS community or open a GitHub issue.
+Questions or contributions? Reach out to the Waggle or CROCUS community or open a GitHub issue. 
+
