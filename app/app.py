@@ -143,18 +143,23 @@ def discover_files(folder_path, glob_pattern, recursive, uploaded_df, skip_last_
 
     base_path = Path(folder_path)
     
-    # Brace-style pattern manually expanded because `rglob` can not use it.
+    base_path = Path(folder_path)
+
     if glob_pattern and "{" in glob_pattern and "}" in glob_pattern:
         ext_match = re.search(r"\*\.\{(.+?)\}", glob_pattern)
         if ext_match:
             extensions = [f".{ext.strip().lower()}" for ext in ext_match.group(1).split(",")]
             paths = sorted([
-                p for p in base_path.rglob("*") 
+                p for p in base_path.rglob("*")
                 if p.is_file() and p.suffix.lower() in extensions
             ])
         else:
             logging.warning(f"Invalid multi-extension glob pattern: {glob_pattern}")
             paths = []
+    else:
+        pattern = f"**/{glob_pattern}" if recursive and glob_pattern else glob_pattern or ("**/*" if recursive else "*")
+        paths = sorted(base_path.rglob(pattern) if recursive else base_path.glob(pattern))
+
 
 
     for path in paths:

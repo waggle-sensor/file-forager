@@ -150,3 +150,21 @@ def test_discover_files_skips_recent(tmp_path):
     # Only 1 file should be returned (the older one)
     assert len(files) == 1
     assert files[0]["path"] == str(f1)
+
+
+    def test_discover_files_multiple_extensions(tmp_path):
+        (tmp_path / "file.csv").write_text("csv")
+        (tmp_path / "file.zip").write_text("zip")
+        (tmp_path / "file.txt").write_text("txt")
+
+        df = pd.DataFrame(columns=["original_path", "filename", "last_modified_timestamp_source", "file_hash"])
+        files = discover_files(
+            str(tmp_path),
+            "*.{" + ",".join(["csv", "zip"]) + "}",
+            recursive=False,
+            uploaded_df=df,
+            skip_last_n=0,
+            sort_key="name",
+            transfer_symlinks=True
+        )
+        assert len(files) == 2
