@@ -142,7 +142,19 @@ def discover_files(folder_path, glob_pattern, recursive, uploaded_df, skip_last_
         pattern = "**/*" if recursive else "*"
 
     base_path = Path(folder_path)
-    paths = sorted(base_path.rglob(pattern) if recursive else base_path.glob(pattern))
+    
+    if glob_pattern and "{" in glob_pattern and "}" in glob_pattern:
+        # Brace-style multi-extension pattern manually expanded
+        extensions = glob_pattern.strip("*{}").split(",")
+        extensions = [f".{ext.strip()}" for ext in extensions]
+        paths = sorted([
+            p for p in base_path.rglob("*") 
+            if p.is_file() and p.suffix in extensions
+        ])
+    else:
+        # Normal glob pattern
+        paths = sorted(base_path.rglob(pattern) if recursive else base_path.glob(pattern))
+
 
     for path in paths:
         if should_skip_file(path, transfer_symlinks):
