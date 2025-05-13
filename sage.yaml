@@ -1,6 +1,6 @@
 name: "file-forager"
 description: "Uploads files from a Waggle node's filesystem to Beehive with local state tracking."
-version: "0.25.5.8"
+version: "0.25.5.13"
 authors: "Bhupendra Raut"
 collaborators: "Yongho Kim, Bobby Jackson, Sean Shahkarami, Max Grover, Joe O'Brien, and Raj Sankaran"
 funding: "CROCUS"
