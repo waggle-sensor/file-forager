@@ -201,17 +201,6 @@ To make path preservation work smoothly:
 
 ---
 
-## ⚠️ Why It Matters
-
-The download tool uses this logic:
-
-1. Strip `mount_dir` prefix from `meta.original_path`
-2. Append the result to your configured `root_dir`
-
-So your mount path during upload determines the folder structure during download.
-
----
-
 ## ✅ Best Practice
 
 Mount your data into file-forager like this (Docker or Kubernetes example):
@@ -224,7 +213,6 @@ Then, no extra configuration is needed when downloading — just set:
 
 ```yaml
 keep_original_path: true
-mount_dir: /data
 ```
 
 ---
@@ -245,17 +233,7 @@ mount_dir: /mnt/storage
 ```
 
 ---
-
-## 🧩 Summary
-
-| Upload Mount Path | `meta.original_path` Example              | `mount_dir` in Downloader YAML |
-|-------------------|--------------------------------------------|-------------------------------|
-| `/data`           | `/data/site1/instrument/file1.nc`         | `/data`                      |
-| `/mnt/storage`    | `/mnt/storage/site1/instrument/file1.nc`  | `/mnt/storage`               |
-
 💡 If there's a mismatch, the downloader will **fail or misplace the files**.
-
-
 
 ## 📢 Contact
 

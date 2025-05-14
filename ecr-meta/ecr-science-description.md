@@ -85,7 +85,6 @@ Remove --dry-run to perform actual uploads.
 | `--source`            | Source directory (default: `/data/`)  |
 | `--glob`              | Glob pattern (e.g., `*.csv`)          |
 | `--recursive`         | Recursively scan subfolders           |
-| `--timestamp`         | File timestamp in Beehive: `"current"` or `"mtime"` |
 | `--skip-last-file`    | Skip N most recently modified files   |
 | `--sort-key`          | Sort by `"mtime"` or `"name"`         |
 | `--max-file-size`     | Max size per file (in bytes)          |
@@ -96,6 +95,12 @@ Remove --dry-run to perform actual uploads.
 | `--transfer-symlinks` | Follow symlinks (default: skip)       |
 | `--DEBUG`             | Enable debug logging                  |
 
+📌 Note: Use multiple file extensions with `--glob` by using **brace expansion** in the glob pattern:
+
+
+```bash
+--glob "*.{csv,json,txt}"
+```
 
 ## 📝 Logging and Status
 
@@ -165,9 +170,71 @@ df = sage_data_client.query(
     }
 )
 ```
-NOTE: When `--timestamp` is set to `mtime`, the file times in Beehive will be backdated to original modified time.
+
+# 📤 Preserving Original File Paths while Downloading
+
+If you plan to **preserve the original directory structure** when downloading files using `keep_original_path: true`, then it is critical to configure your `file-forager` upload setup correctly. This ensures that the original file path (`meta.original_path`) can be reliably interpreted later during download.
+
+---
+
+## 📌 What Is `meta.original_path`?
+
+When `file-forager` uploads files, it includes the full path of the file on disk in a metadata field called `meta.original_path`. This is the path used by the downloader (if configured) to reconstruct the original directory structure.
+
+---
+
+## ✅ Mount Directory Guidelines
+
+To make path preservation work smoothly:
+
+- You **should mount your upload data directory at `/data/`** inside the file-forager container.
+- This makes sure that uploaded files have `meta.original_path` values like:
+  
+  ```
+  /data/site1/instrument/file1.nc
+  /data/site2/instrument/file2.nc
+  ```
+
+- If you mount your data at **any other path**, like `/mnt/storage/` or `/uploads/`, then:
+  - That path will appear in `meta.original_path`
+  - You **must set the same value** as `mount_dir` in your downloader YAML config to match it
+
+---
+
+## ✅ Best Practice
+
+Mount your data into file-forager like this (Docker or Kubernetes example):
+
+```bash
+-v /real/data/path:/data
+```
+
+Then, no extra configuration is needed when downloading — just set:
+
+```yaml
+keep_original_path: true
+```
+
+---
+
+## 🔁 If Using a Custom Mount Path
+
+If your upload environment uses a different path, such as:
+
+```bash
+-v /real/data/path:/mnt/storage
+```
+
+Then make sure your downloader config reflects that:
+
+```yaml
+keep_original_path: true
+mount_dir: /mnt/storage
+```
+
+---
+💡 If there's a mismatch, the downloader will **fail or misplace the files**.
 
 ## 📢 Contact
 
-Questions or contributions? Reach out to the Waggle or CROCUS community or open a GitHub issue. 
-
+Questions or contributions? Reach out to the Waggle or CROCUS community or open a GitHub issue.
